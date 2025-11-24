@@ -1,0 +1,11 @@
+{
+  "name": "local-install-skill",
+  "version": "1.0.0",
+  "description": "Install Claude Code skills from GitHub repositories to project scope",
+  "author": {
+    "name": "lagz0ne"
+  },
+  "repository": "https://github.com/lagz0ne/local-install-skill",
+  "license": "MIT",
+  "keywords": ["skills", "installer", "local", "project-scope"]
+}
