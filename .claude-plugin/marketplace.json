@@ -1,0 +1,19 @@
+{
+  "name": "local-install-skill",
+  "owner": {
+    "name": "lagz0ne"
+  },
+  "metadata": {
+    "description": "Install Claude Code skills from GitHub to project scope",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "local-install-skill",
+      "source": "./",
+      "description": "Install skills from GitHub repositories to project scope (.claude/skills/)",
+      "version": "1.0.0",
+      "strict": false
+    }
+  ]
+}
