@@ -76,11 +76,36 @@ The `mode` variable (value: `"copy"` or `"submodule"`) is used in subsequent ins
 ### Step 1: Setup directories
 
 ```bash
-mkdir -p .claude/plugins/local
 mkdir -p .claude/skills
 ```
 
-### Step 2: Execute Installation Based on Mode
+### Step 2: Find skills to install
+
+If `--all` flag:
+- Look for `skills/` directory in cloned repo
+- Find all subdirectories containing `SKILL.md`
+- Collect list of skill names
+
+If specific skill path:
+- Check if `skills/<skill-name>/SKILL.md` exists
+- If not, check if `<skill-name>/SKILL.md` exists at root
+- If not found, report error with helpful message
+
+If no skill specified:
+- Check if repo root has `SKILL.md` (repo IS the skill)
+- If not, check if `skills/` directory exists and has exactly one skill
+- If multiple skills found, list them and ask user to specify
+
+### Step 3: Validate each skill
+
+For each skill to install:
+1. Verify `SKILL.md` exists
+2. Read frontmatter and validate:
+   - `name` field exists (max 64 chars)
+   - `description` field exists (max 1024 chars)
+3. Warn if validation fails but continue
+
+### Step 4: Execute Installation Based on Mode
 
 #### If mode is "copy":
 
@@ -130,10 +155,26 @@ Either initialize git first (git init) or use --copy mode.
 if [ -d ".claude/submodules/<repo>" ]; then
     # Verify it's the same source
     EXISTING_URL=$(git config --file .gitmodules submodule..claude/submodules/<repo>.url)
+    EXPECTED_URL="https://github.com/<owner>/<repo>.git"
+
+    if [ "$EXISTING_URL" = "$EXPECTED_URL" ]; then
+        # Same URL - use existing submodule, skip git submodule add
+        echo "Submodule already exists with matching URL, using existing"
+    else
+        # Different URL - error
+        echo "Error: Submodule exists but URL differs"
+        echo "  Existing: $EXISTING_URL"
+        echo "  Expected: $EXPECTED_URL"
+        exit 1
+    fi
 fi
 ```
 
 **2c. Add submodule if not exists:**
+
+Skip if submodule already exists with matching URL (from step 2b).
+
+Otherwise:
 ```bash
 mkdir -p .claude/submodules
 git submodule add https://github.com/<owner>/<repo>.git .claude/submodules/<repo>
@@ -149,33 +190,7 @@ git submodule add -b <branch> https://github.com/<owner>/<repo>.git .claude/subm
 COMMIT_SHA=$(git -C ".claude/submodules/<repo>" rev-parse HEAD)
 ```
 
-### Step 4: Find skills to install
-
-If `--all` flag:
-- Look for `skills/` directory in cloned repo
-- Find all subdirectories containing `SKILL.md`
-- Collect list of skill names
-
-If specific skill path:
-- Check if `skills/<skill-name>/SKILL.md` exists
-- If not, check if `<skill-name>/SKILL.md` exists at root
-- If not found, report error with helpful message
-
-If no skill specified:
-- Check if repo root has `SKILL.md` (repo IS the skill)
-- If not, check if `skills/` directory exists and has exactly one skill
-- If multiple skills found, list them and ask user to specify
-
-### Step 5: Validate each skill
-
-For each skill to install:
-1. Verify `SKILL.md` exists
-2. Read frontmatter and validate:
-   - `name` field exists (max 64 chars)
-   - `description` field exists (max 1024 chars)
-3. Warn if validation fails but continue
-
-### Step 6: Create symlinks (submodule mode only)
+### Step 5: Create symlinks (submodule mode only)
 
 **Skip this step if mode is "copy"** - files are already in `.claude/skills/<name>/`.
 
@@ -196,7 +211,7 @@ For example, if skill is at `skills/brainstorming/`:
 ln -s ../submodules/superpowers/skills/brainstorming .claude/skills/brainstorming
 ```
 
-### Step 7: Update registry
+### Step 6: Update registry
 
 Read or create `.claude/local-plugins.yaml`:
 
@@ -241,7 +256,7 @@ If repo already in submodules, just append skill name to the `skills` list.
 
 **Write YAML:** Use proper YAML formatting with 2-space indentation.
 
-### Step 8: Update .gitignore (copy mode only)
+### Step 7: Update .gitignore (copy mode only)
 
 **Skip this step for submodule mode** - submodules are tracked by git naturally.
 
@@ -249,7 +264,7 @@ For copy mode, the skill files in `.claude/skills/<name>/` will be committed dir
 
 **Note:** The old `.claude/plugins/local/` pattern can be removed from .gitignore if present, as we no longer use that directory.
 
-### Step 9: Report success
+### Step 8: Report success
 
 **Copy mode output:**
 ```

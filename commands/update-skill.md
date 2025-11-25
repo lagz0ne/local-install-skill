@@ -55,15 +55,16 @@ Use /install-skill to install skills from GitHub.
 
 Update the entire submodule (updates all skills from that repo):
 
-```bash
-git -C .claude/submodules/<repo> fetch origin
-git -C .claude/submodules/<repo> pull origin <branch>
-```
-
 Capture old and new SHA:
 ```bash
+# BEFORE fetch/pull
 OLD_SHA=$(git -C .claude/submodules/<repo> rev-parse HEAD)
-# After pull
+
+# Fetch and pull
+git -C .claude/submodules/<repo> fetch origin
+git -C .claude/submodules/<repo> pull origin <branch>
+
+# AFTER pull
 NEW_SHA=$(git -C .claude/submodules/<repo> rev-parse HEAD)
 ```
 
