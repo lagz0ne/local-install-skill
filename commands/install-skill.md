@@ -241,14 +241,13 @@ If repo already in submodules, just append skill name to the `skills` list.
 
 **Write YAML:** Use proper YAML formatting with 2-space indentation.
 
-### Step 8: Update .gitignore
+### Step 8: Update .gitignore (copy mode only)
 
-Ensure `.claude/plugins/local/` is in `.gitignore`:
-```bash
-echo ".claude/plugins/local/" >> .gitignore
-```
+**Skip this step for submodule mode** - submodules are tracked by git naturally.
 
-Only add if not already present.
+For copy mode, the skill files in `.claude/skills/<name>/` will be committed directly. No .gitignore changes needed.
+
+**Note:** The old `.claude/plugins/local/` pattern can be removed from .gitignore if present, as we no longer use that directory.
 
 ### Step 9: Report success
 
