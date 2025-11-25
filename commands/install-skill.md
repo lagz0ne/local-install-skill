@@ -251,15 +251,28 @@ For copy mode, the skill files in `.claude/skills/<name>/` will be committed dir
 
 ### Step 9: Report success
 
-Output:
+**Copy mode output:**
 ```
 Installing skill from github.com/<owner>/<repo>...
-├── Cloning: <owner>/<repo> (branch: <branch>)
-├── Found skill: skills/<skill-name>/SKILL.md
+├── Mode: Copy
+├── Downloading: <skillPath>
+├── Copying to: .claude/skills/<skill-name>
+└── Status: Installed successfully
+
+Skill "<skill-name>" is now available in this project.
+```
+
+**Submodule mode output:**
+```
+Installing skill from github.com/<owner>/<repo>...
+├── Mode: Submodule
+├── Adding submodule: .claude/submodules/<repo>
 ├── Creating symlink: .claude/skills/<skill-name>
 └── Status: Installed successfully
 
 Skill "<skill-name>" is now available in this project.
+
+Note: Team members should run `git submodule update --init` after cloning.
 ```
 
 ## Error Handling
