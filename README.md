@@ -18,18 +18,28 @@ Claude Code's marketplace installs plugins to user scope (`~/.claude/plugins/`).
 /plugin install local-install-skill@lagz0ne
 ```
 
-Or install directly to a project:
-```bash
-git clone https://github.com/lagz0ne/local-install-skill.git .claude/plugins/local/local-install-skill
-```
+## Installation Modes
+
+Choose how skills are stored in your project:
+
+| Mode | Storage | Best For |
+|------|---------|----------|
+| **Submodule** (default) | Git submodule + symlink | Teams, frequently updated skills |
+| **Copy** | Direct file copy | Minimal footprint, one-off skills |
 
 ## Usage
 
 ### Install a skill
 
 ```bash
-# Install specific skill from a repo
+# Install with interactive mode selection (default: submodule)
 /install-skill user/repo:skill-name
+
+# Explicitly use submodule mode
+/install-skill user/repo:skill-name --submodule
+
+# Use copy mode (files copied directly)
+/install-skill user/repo:skill-name --copy
 
 # Install from specific branch
 /install-skill user/repo#develop:skill-name
@@ -41,45 +51,94 @@ git clone https://github.com/lagz0ne/local-install-skill.git .claude/plugins/loc
 ### Update installed skills
 
 ```bash
-# Update specific repo
+# Update a submodule repo (updates all skills from it)
 /update-skill repo-name
 
-# Update all repos
+# Update a copy-mode skill (re-downloads)
+/update-skill skill-name
+
+# Update all
 /update-skill --all
 ```
 
 ### Remove a skill
 
 ```bash
-# Remove skill (keep repo)
+# Remove skill (cleans up submodule if no other skills use it)
 /remove-skill skill-name
-
-# Remove skill and repo (if no other skills installed)
-/remove-skill skill-name --purge
 ```
 
 ## How it works
 
-1. **Clone**: Full git clone to `.claude/plugins/local/<repo>/`
-2. **Symlink**: Creates symlink in `.claude/skills/<skill-name>`
-3. **Registry**: Tracks installs in `.claude/local-plugins.json`
+### Submodule Mode (default)
 
 ```
 .claude/
-├── plugins/local/           # Git clones (gitignored)
-│   └── some-repo/
+├── submodules/              # Git submodules
+│   └── superpowers/         # Full repo as submodule
 │       └── skills/
-│           └── cool-skill/
+│           └── brainstorming/
 ├── skills/                  # Symlinks (committed)
-│   └── cool-skill -> ../plugins/local/some-repo/skills/cool-skill
-└── local-plugins.json       # Registry (committed)
+│   └── brainstorming -> ../submodules/superpowers/skills/brainstorming
+└── local-plugins.yaml       # Registry (committed)
 ```
 
-## Team workflow
+### Copy Mode
 
-1. One team member installs skills: `/install-skill org/repo:skill-name`
-2. Commit the symlinks and registry: `git add .claude/skills .claude/local-plugins.json`
-3. Other team members clone and run: `/install-skill` (reads registry, clones repos)
+```
+.claude/
+├── skills/                  # Copied files (committed)
+│   └── my-skill/
+│       └── SKILL.md
+└── local-plugins.yaml       # Registry (committed)
+```
+
+## Registry Format
+
+Skills are tracked in `.claude/local-plugins.yaml`:
+
+```yaml
+version: 2
+
+skills:
+  brainstorming:
+    mode: submodule
+    source: github.com/user/superpowers
+    repo: superpowers
+    branch: main
+    skillPath: skills/brainstorming
+    commitSha: abc123...
+
+  my-skill:
+    mode: copy
+    source: github.com/user/other-repo
+    branch: main
+    skillPath: skills/my-skill
+    commitSha: def456...
+
+submodules:
+  superpowers:
+    source: github.com/user/superpowers
+    path: .claude/submodules/superpowers
+    skills:
+      - brainstorming
+```
+
+## Team Workflow
+
+### For submodule mode:
+
+1. One team member installs: `/install-skill org/repo:skill-name`
+2. Commit: `git add .claude/skills .claude/local-plugins.yaml .gitmodules`
+3. Push to remote
+4. Other team members: `git pull && git submodule update --init`
+
+### For copy mode:
+
+1. One team member installs: `/install-skill org/repo:skill-name --copy`
+2. Commit: `git add .claude/skills .claude/local-plugins.yaml`
+3. Push to remote
+4. Other team members: `git pull` (skills are already in the files)
 
 ## License
 
