@@ -5,9 +5,6 @@ arguments:
   - name: skill_name
     description: "Name of the skill to remove"
     required: true
-  - name: purge
-    description: "Also remove the cloned repository if no other skills are installed from it"
-    required: false
 ---
 
 # Remove Locally Installed Skill
@@ -17,134 +14,121 @@ You are removing a Claude Code skill that was installed via `/install-skill`.
 ## Parse the Input
 
 - `skill_name`: `$ARGUMENTS.skill_name` - The skill to remove
-- `purge`: Check if `--purge` flag is present in arguments
 
 ## Removal Process
 
-### Step 1: Verify skill exists
+### Step 1: Read registry and find skill
 
-Check if `.claude/skills/<skill_name>` exists.
+Read `.claude/local-plugins.yaml`.
 
-If not found:
+Look up `skills.<skill_name>`. If not found:
 ```
-Error: Skill "<skill_name>" not found in .claude/skills/
+Error: Skill "<skill_name>" not found in registry.
 
 Installed skills:
-  - skill-a (from repo-x)
-  - skill-b (from repo-y)
+  - skill-a (copy)
+  - skill-b (submodule)
+
+Use the exact skill name from the list above.
 ```
 
-List installed skills by reading symlinks and registry.
+Extract the skill's `mode` for appropriate removal.
 
-### Step 2: Check if it's a symlink
+### Step 2: Remove skill files/symlink
+
+#### If mode is "copy":
 
 ```bash
-if [ -L ".claude/skills/<skill_name>" ]; then
-    # It's a symlink (installed by us)
-    TARGET=$(readlink ".claude/skills/<skill_name>")
-else
-    # It's a regular directory (not installed by us)
-fi
+rm -rf ".claude/skills/<skill_name>"
 ```
 
-If not a symlink:
-```
-Warning: .claude/skills/<skill_name> is not a symlink.
-This skill was not installed via /install-skill.
-
-Remove anyway? This will delete the directory and its contents.
-```
-
-Ask for confirmation before proceeding with non-symlink removal.
-
-### Step 3: Identify source repository
-
-Parse the symlink target to find the repo:
-```
-../plugins/local/<repo>/skills/<skill_name>
-```
-
-Extract `<repo>` from the path.
-
-### Step 4: Remove symlink
+#### If mode is "submodule":
 
 ```bash
-rm .claude/skills/<skill_name>
+rm ".claude/skills/<skill_name>"  # Remove symlink only
 ```
 
-### Step 5: Update registry
+### Step 3: Update registry - skills section
 
-Read `.claude/local-plugins.json`.
+Remove the skill entry from `skills` section.
 
-Remove skill from repo's `installedSkills` array:
-```json
-{
-  "repos": {
-    "<repo>": {
-      "installedSkills": ["skill-a", "skill-b"]  // Remove the uninstalled one
-    }
-  }
-}
-```
+### Step 4: Handle submodule cleanup (submodule mode only)
 
-### Step 6: Handle --purge flag
+**Skip if mode is "copy".**
 
-If `--purge` flag is set:
+Check if other skills still use this submodule:
+1. Read `submodules.<repo>.skills` list
+2. Remove `<skill_name>` from the list
+3. If list is now empty, remove the submodule:
 
-Check if repo has other installed skills:
-```javascript
-if (repo.installedSkills.length === 0) {
-    // No other skills, safe to remove repo
-}
-```
-
-If no other skills installed from this repo:
 ```bash
-rm -rf .claude/plugins/local/<repo>
+git submodule deinit .claude/submodules/<repo>
+git rm .claude/submodules/<repo>
+rm -rf .git/modules/.claude/submodules/<repo>
 ```
 
-Remove repo entry from registry entirely.
+Remove the repo entry from `submodules` section.
 
-If other skills still installed:
+If other skills still use the submodule:
 ```
-Note: Repository <repo> still has other skills installed:
-  - other-skill-a
-  - other-skill-b
-
-Repository not removed. Use /remove-skill for each, or manually delete.
+Note: Submodule .claude/submodules/<repo> retained.
+Other skills still using it: skill-x, skill-y
 ```
 
-### Step 7: Clean up empty directories
+### Step 5: Clean up empty directories
 
 ```bash
 # Remove empty skills directory if no skills left
 rmdir .claude/skills 2>/dev/null || true
 
-# Remove empty plugins/local directory if no repos left
-rmdir .claude/plugins/local 2>/dev/null || true
-rmdir .claude/plugins 2>/dev/null || true
+# Remove empty submodules directory if no submodules left
+rmdir .claude/submodules 2>/dev/null || true
 ```
 
-### Step 8: Report success
+### Step 6: Write updated registry
 
-**Basic removal:**
+Write `.claude/local-plugins.yaml`.
+
+If no skills remain, consider removing the file:
+```bash
+if [ -z "$(grep -v '^version:' .claude/local-plugins.yaml | grep -v '^skills: {}' | grep -v '^submodules: {}')" ]; then
+    rm .claude/local-plugins.yaml
+fi
+```
+
+### Step 7: Report success
+
+**Copy mode removal:**
 ```
 Removing skill "<skill_name>"...
-├── Removed symlink: .claude/skills/<skill_name>
-├── Updated registry
-└── Repository <repo> retained (other skills installed)
+├── Mode: Copy
+├── Removed: .claude/skills/<skill_name>/
+└── Registry updated
 
 Skill "<skill_name>" has been removed.
 ```
 
-**With purge:**
+**Submodule mode removal (submodule kept):**
 ```
 Removing skill "<skill_name>"...
+├── Mode: Submodule
 ├── Removed symlink: .claude/skills/<skill_name>
-├── Removed repository: .claude/plugins/local/<repo>
-└── Cleaned up registry
+├── Submodule retained: .claude/submodules/<repo>
+│   └── Other skills: skill-x, skill-y
+└── Registry updated
 
-Skill "<skill_name>" and its repository have been removed.
+Skill "<skill_name>" has been removed.
+```
+
+**Submodule mode removal (submodule removed):**
+```
+Removing skill "<skill_name>"...
+├── Mode: Submodule
+├── Removed symlink: .claude/skills/<skill_name>
+├── Removed submodule: .claude/submodules/<repo>
+└── Registry updated
+
+Skill "<skill_name>" and its submodule have been removed.
 ```
 
 ## List Installed Skills
@@ -154,26 +138,24 @@ If user runs `/remove-skill` without arguments or with `--list`:
 ```
 Locally installed skills:
 
-From superpowers-marketplace (github.com/obra/superpowers-marketplace):
-  - brainstorming
-  - tdd
-  - systematic-debugging
+Copy mode:
+  - my-custom-skill (from github.com/user/repo)
 
-From my-team-skills (github.com/myorg/team-skills):
-  - code-review
-  - deployment
+Submodule mode:
+  - brainstorming (from github.com/obra/superpowers)
+  - tdd (from github.com/obra/superpowers)
 
-Use: /remove-skill <skill-name> [--purge]
+Use: /remove-skill <skill-name>
 ```
 
 ## Error Handling
 
-**Skill not in registry but symlink exists:**
+**Skill files missing but in registry:**
 ```
-Warning: Skill "<skill_name>" found but not in registry.
+Warning: Skill "<skill_name>" in registry but files not found.
+Cleaning up registry entry...
 
-This may be a manually created symlink or from an older installation.
-Remove the symlink anyway? (y/n)
+Done. Registry cleaned.
 ```
 
 **Permission error:**
@@ -183,10 +165,12 @@ Error: Permission denied removing .claude/skills/<skill_name>
 Check file permissions and try again.
 ```
 
-**Registry corrupted:**
+**Submodule removal fails:**
 ```
-Warning: Could not parse .claude/local-plugins.json
+Error: Failed to remove submodule .claude/submodules/<repo>
 
-Proceeding with symlink removal only.
-Consider manually fixing or deleting the registry file.
+Manual cleanup may be required:
+  git submodule deinit .claude/submodules/<repo>
+  git rm .claude/submodules/<repo>
+  rm -rf .git/modules/.claude/submodules/<repo>
 ```
