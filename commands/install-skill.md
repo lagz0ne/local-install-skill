@@ -80,26 +80,73 @@ mkdir -p .claude/plugins/local
 mkdir -p .claude/skills
 ```
 
-### Step 2: Check if repo already cloned
+### Step 2: Execute Installation Based on Mode
 
-Check if `.claude/plugins/local/<repo>/` exists.
+#### If mode is "copy":
 
-If exists:
-- Run `git -C .claude/plugins/local/<repo> pull` to update
-- Continue to Step 4
-
-If not exists:
-- Continue to Step 3
-
-### Step 3: Clone the repository
-
+**2a. Clone to temporary directory:**
 ```bash
-git clone --depth=1 https://github.com/<owner>/<repo>.git .claude/plugins/local/<repo>
+TEMP_DIR=$(mktemp -d)
+git clone --depth=1 https://github.com/<owner>/<repo>.git "$TEMP_DIR"
 ```
 
-If a specific branch was specified:
+If specific branch:
 ```bash
-git clone --depth=1 --branch <branch> https://github.com/<owner>/<repo>.git .claude/plugins/local/<repo>
+git clone --depth=1 --branch <branch> https://github.com/<owner>/<repo>.git "$TEMP_DIR"
+```
+
+**2b. Get commit SHA before cleanup:**
+```bash
+COMMIT_SHA=$(git -C "$TEMP_DIR" rev-parse HEAD)
+```
+
+**2c. Copy skill directory:**
+```bash
+mkdir -p .claude/skills
+cp -r "$TEMP_DIR/<skillPath>" ".claude/skills/<skill-name>"
+```
+
+**2d. Clean up temp directory:**
+```bash
+rm -rf "$TEMP_DIR"
+```
+
+#### If mode is "submodule":
+
+**2a. Check if this is a git repository:**
+```bash
+git rev-parse --git-dir > /dev/null 2>&1
+```
+
+If not a git repo, error:
+```
+Error: Submodule mode requires a git repository.
+
+Either initialize git first (git init) or use --copy mode.
+```
+
+**2b. Check if submodule already exists:**
+```bash
+if [ -d ".claude/submodules/<repo>" ]; then
+    # Verify it's the same source
+    EXISTING_URL=$(git config --file .gitmodules submodule..claude/submodules/<repo>.url)
+fi
+```
+
+**2c. Add submodule if not exists:**
+```bash
+mkdir -p .claude/submodules
+git submodule add https://github.com/<owner>/<repo>.git .claude/submodules/<repo>
+```
+
+If specific branch:
+```bash
+git submodule add -b <branch> https://github.com/<owner>/<repo>.git .claude/submodules/<repo>
+```
+
+**2d. Get commit SHA:**
+```bash
+COMMIT_SHA=$(git -C ".claude/submodules/<repo>" rev-parse HEAD)
 ```
 
 ### Step 4: Find skills to install
