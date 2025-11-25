@@ -32,6 +32,23 @@ Extract:
 - `skillPath`: Path to skill within repo (optional)
 - `installAll`: Boolean flag for --all
 
+## Determine Installation Mode
+
+Check for mode flags in `$ARGUMENTS.mode` or within `$ARGUMENTS.source`:
+
+**Flag detection:**
+- If `--copy` present: `mode = "copy"`
+- If `--submodule` present: `mode = "submodule"`
+- If neither: Prompt user to choose
+
+**Interactive prompt (when no flag):**
+
+Use AskUserQuestion with these options:
+- **Submodule (default)** - Full repo as git submodule, easy updates via `git submodule update`
+- **Copy** - Only skill files copied, minimal footprint, manual re-download to update
+
+Store the selected mode for use in later steps.
+
 ## Installation Process
 
 ### Step 1: Setup directories
