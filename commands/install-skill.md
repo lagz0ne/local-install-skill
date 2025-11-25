@@ -198,35 +198,48 @@ ln -s ../submodules/superpowers/skills/brainstorming .claude/skills/brainstormin
 
 ### Step 7: Update registry
 
-Read or create `.claude/local-plugins.json`:
+Read or create `.claude/local-plugins.yaml`:
 
-```json
-{
-  "version": 1,
-  "repos": {}
-}
+```yaml
+version: 2
+skills: {}
+submodules: {}
 ```
 
-Add/update repo entry:
-```json
-{
-  "version": 1,
-  "repos": {
-    "<repo>": {
-      "source": "github.com/<owner>/<repo>",
-      "branch": "<branch>",
-      "clonedAt": "<ISO timestamp>",
-      "gitCommitSha": "<current HEAD sha>",
-      "installedSkills": ["<skill-name>", ...]
-    }
-  }
-}
+**Migration:** If `.claude/local-plugins.json` exists (v1), migrate it first:
+1. Read JSON content
+2. Convert each repo's skills to v2 format with `mode: legacy`
+3. Write to `.claude/local-plugins.yaml`
+4. Delete `.claude/local-plugins.json`
+
+**Add skill entry:**
+
+```yaml
+skills:
+  <skill-name>:
+    mode: <copy|submodule>
+    source: github.com/<owner>/<repo>
+    repo: <repo>
+    branch: <branch>
+    skillPath: <path/to/skill>
+    installedAt: <ISO timestamp>
+    commitSha: <sha>
 ```
 
-Get commit SHA:
-```bash
-git -C .claude/plugins/local/<repo> rev-parse HEAD
+**If submodule mode, also update submodules section:**
+
+```yaml
+submodules:
+  <repo>:
+    source: github.com/<owner>/<repo>
+    path: .claude/submodules/<repo>
+    skills:
+      - <skill-name>
 ```
+
+If repo already in submodules, just append skill name to the `skills` list.
+
+**Write YAML:** Use proper YAML formatting with 2-space indentation.
 
 ### Step 8: Update .gitignore
 
