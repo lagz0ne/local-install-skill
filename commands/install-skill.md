@@ -5,6 +5,9 @@ arguments:
   - name: source
     description: "GitHub repo with optional branch and skill path: user/repo, user/repo:skill-name, user/repo#branch:skill-name, or user/repo --all"
     required: true
+  - name: mode
+    description: "Installation mode: --copy (files only) or --submodule (git submodule, default)"
+    required: false
 ---
 
 # Install Skill from GitHub
