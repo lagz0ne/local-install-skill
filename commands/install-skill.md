@@ -175,9 +175,11 @@ For each skill to install:
    - `description` field exists (max 1024 chars)
 3. Warn if validation fails but continue
 
-### Step 6: Create symlinks
+### Step 6: Create symlinks (submodule mode only)
 
-For each skill:
+**Skip this step if mode is "copy"** - files are already in `.claude/skills/<name>/`.
+
+For submodule mode, create symlink:
 
 Check if `.claude/skills/<skill-name>` already exists:
 - If symlink pointing to same target: skip, already installed
@@ -185,12 +187,13 @@ Check if `.claude/skills/<skill-name>` already exists:
 
 Create relative symlink:
 ```bash
-ln -s ../plugins/local/<repo>/skills/<skill-name> .claude/skills/<skill-name>
+mkdir -p .claude/skills
+ln -s ../submodules/<repo>/<skillPath> .claude/skills/<skill-name>
 ```
 
-Or if skill is at repo root:
+For example, if skill is at `skills/brainstorming/`:
 ```bash
-ln -s ../plugins/local/<repo> .claude/skills/<skill-name>
+ln -s ../submodules/superpowers/skills/brainstorming .claude/skills/brainstorming
 ```
 
 ### Step 7: Update registry
