@@ -37,17 +37,39 @@ Extract:
 Check for mode flags in `$ARGUMENTS.mode` or within `$ARGUMENTS.source`:
 
 **Flag detection:**
-- If `--copy` present: `mode = "copy"`
-- If `--submodule` present: `mode = "submodule"`
-- If neither: Prompt user to choose
+
+1. First check `$ARGUMENTS.mode`:
+   - If `--copy` or `copy`: `mode = "copy"`
+   - If `--submodule` or `submodule`: `mode = "submodule"`
+
+2. If not found, check if flag is appended to source string:
+   - Split `$ARGUMENTS.source` by spaces
+   - If last token is `--copy`: `mode = "copy"`, remove flag from source
+   - If last token is `--submodule`: `mode = "submodule"`, remove flag from source
+
+3. If no flag found, prompt user:
 
 **Interactive prompt (when no flag):**
 
-Use AskUserQuestion with these options:
-- **Submodule (default)** - Full repo as git submodule, easy updates via `git submodule update`
-- **Copy** - Only skill files copied, minimal footprint, manual re-download to update
+```
+Use AskUserQuestion:
+  question: "How would you like to install this skill?"
+  header: "Install Mode"
+  multiSelect: false
+  options:
+    - label: "Submodule (recommended)"
+      description: "Full repo as git submodule, easy updates via git submodule update"
+    - label: "Copy"
+      description: "Only skill files copied, minimal footprint, re-run install to update"
+```
 
-Store the selected mode for use in later steps.
+Map user response to mode variable:
+- "Submodule (recommended)" → `mode = "submodule"`
+- "Copy" → `mode = "copy"`
+
+**Default:** If user doesn't respond or cancels, default to `mode = "submodule"`.
+
+The `mode` variable (value: `"copy"` or `"submodule"`) is used in subsequent installation steps.
 
 ## Installation Process
 
