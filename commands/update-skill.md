@@ -15,140 +15,146 @@ You are updating Claude Code skills that were installed via `/install-skill`.
 
 Parse the target argument: `$ARGUMENTS.target`
 
-- If empty or not provided: List installed repos and ask which to update
-- If `--all`: Update all repos in registry
-- Otherwise: Update the specified repo
+- If empty or not provided: List installed skills and ask which to update
+- If `--all`: Update all updateable skills
+- Otherwise: Update the specified skill or repo
 
 ## Update Process
 
 ### Step 1: Read registry
 
-Read `.claude/local-plugins.json`.
+Read `.claude/local-plugins.yaml`.
 
-If file doesn't exist:
+**Migration check:** If `.claude/local-plugins.json` exists but `.yaml` doesn't, run migration first.
+
+If no registry found:
 ```
 No locally installed skills found.
 
 Use /install-skill to install skills from GitHub.
 ```
 
-### Step 2: Identify repos to update
+### Step 2: Identify what to update
 
-If `--all`:
-- Get all repo names from registry
+**If `--all`:**
+- Get all skills from registry
+- Group by mode for appropriate update method
 
-If specific repo:
-- Verify repo exists in registry
-- If not found, list available repos
+**If specific target:**
+- Check if it's a skill name in `skills` section
+- Check if it's a repo name in `submodules` section
+- If not found, list available options
 
-If no target specified:
-- List all repos with their installed skills
+**If no target:**
+- List all skills with their mode and source
 - Ask user which to update
 
-### Step 3: Update each repo
+### Step 3: Update based on mode
 
-For each repo to update:
+#### For submodule-based skills:
+
+Update the entire submodule (updates all skills from that repo):
 
 ```bash
-cd .claude/plugins/local/<repo>
-git fetch origin
-git reset --hard origin/<branch>
+git -C .claude/submodules/<repo> fetch origin
+git -C .claude/submodules/<repo> pull origin <branch>
 ```
 
-Capture the old and new commit SHA:
+Capture old and new SHA:
 ```bash
-# Before
-OLD_SHA=$(git rev-parse HEAD)
-
-# After fetch and reset
-NEW_SHA=$(git rev-parse HEAD)
+OLD_SHA=$(git -C .claude/submodules/<repo> rev-parse HEAD)
+# After pull
+NEW_SHA=$(git -C .claude/submodules/<repo> rev-parse HEAD)
 ```
 
-### Step 4: Verify symlinks
+Update all skills from this repo in registry with new `commitSha`.
 
-For each installed skill from this repo:
-1. Check if symlink still exists in `.claude/skills/`
-2. Check if symlink target still exists (skill wasn't removed from repo)
-3. If target missing, warn user and offer to remove symlink
+#### For copy-based skills:
 
-### Step 5: Check for new skills
+Re-download and overwrite:
 
-List skills in updated repo:
 ```bash
-ls .claude/plugins/local/<repo>/skills/
+TEMP_DIR=$(mktemp -d)
+git clone --depth=1 --branch <branch> https://github.com/<owner>/<repo>.git "$TEMP_DIR"
+NEW_SHA=$(git -C "$TEMP_DIR" rev-parse HEAD)
 ```
 
-Compare with `installedSkills` in registry.
-
-If new skills available:
+Compare with stored `commitSha`. If same:
 ```
-New skills available in <repo>:
-  - new-skill-a
-  - new-skill-b
-
-Install with: /install-skill <owner>/<repo>:new-skill-a
+Skill "<name>" is already up to date (sha: <sha>)
 ```
 
-### Step 6: Update registry
+If different:
+```bash
+rm -rf ".claude/skills/<skill-name>"
+cp -r "$TEMP_DIR/<skillPath>" ".claude/skills/<skill-name>"
+rm -rf "$TEMP_DIR"
+```
 
-Update the repo entry in `.claude/local-plugins.json`:
-- Update `gitCommitSha` to new SHA
-- Keep `installedSkills` unchanged (only /install-skill modifies this)
+Update `commitSha` in registry.
 
-### Step 7: Report results
+### Step 4: Verify integrity
+
+**For submodule skills:**
+- Check symlinks still point to valid targets
+- If skill was removed from upstream repo, warn user
+
+**For copy skills:**
+- Verify files were copied successfully
+
+### Step 5: Update registry
+
+Write updated `.claude/local-plugins.yaml` with new `commitSha` values.
+
+### Step 6: Report results
 
 **No changes:**
 ```
-Updating <repo>...
+Updating <skill-name>...
 └── Already up to date (sha: abc123)
 ```
 
-**Updated:**
+**Updated (submodule):**
 ```
-Updating <repo>...
+Updating submodule <repo>...
 ├── Previous: abc123
 ├── Updated to: def456
-├── Changes: 3 commits
-└── Symlinks verified: 2 skills OK
+├── Skills updated: brainstorming, tdd
+└── Symlinks verified: OK
 
 Skills updated successfully.
 ```
 
-**With warnings:**
+**Updated (copy):**
 ```
-Updating <repo>...
+Updating skill <name>...
 ├── Previous: abc123
 ├── Updated to: def456
-├── Warning: Skill "old-skill" was removed from repo
-│   └── Symlink .claude/skills/old-skill is now broken
-│   └── Run: /remove-skill old-skill
-└── 1 of 2 skills OK
-
-Update completed with warnings.
+├── Files replaced in: .claude/skills/<name>
+└── Status: Updated successfully
 ```
 
 ## Error Handling
 
-**Repo directory missing:**
+**Submodule directory missing:**
 ```
-Error: Repository directory not found: .claude/plugins/local/<repo>
+Error: Submodule not found: .claude/submodules/<repo>
 
-The repository may have been manually deleted.
-Run /install-skill to reinstall, or /remove-skill to clean up registry.
+Run `git submodule update --init` or reinstall with /install-skill.
 ```
 
 **Network error:**
 ```
-Error: Failed to fetch updates for <repo>
+Error: Failed to fetch updates
 
 Check your network connection and try again.
 ```
 
-**Merge conflicts (shouldn't happen with --hard reset):**
+**Skill not in registry:**
 ```
-Error: Failed to update <repo>
+Error: Skill "<name>" not found in registry.
 
-Try removing and reinstalling:
-  /remove-skill <skill-name> --purge
-  /install-skill <owner>/<repo>:<skill-name>
+Installed skills:
+  - skill-a (copy mode)
+  - skill-b (submodule mode)
 ```
